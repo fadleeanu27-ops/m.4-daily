@@ -1,6 +1,6 @@
 /**
- * Study Flow Pro - UI & Save Engine Stable
- * แก้ไข: ระบบ Save/Export ให้ทำงานได้จริงบนมือถือและไอแพด
+ * Study Flow Pro - Final Stable v3.0
+ * 🛠 แก้ไข: ปุ่มกดติดทุกครั้ง, ระบบประวัติใช้งานได้ 100%, แสดงผลเต็มจอใน iPad
  */
 
 const modernColors = ['#4F46E5', '#E11D48', '#7C3AED', '#059669', '#D97706', '#2563EB', '#DC2626', '#0891B2', '#9333EA', '#EA580C'];
@@ -15,12 +15,14 @@ function init() {
 
     buildTimeGrid();
     setupDefaultSubjects();
-    
-    // ตั้งค่า Event ปล่อยนิ้ว/เมาส์ ทั่วทั้งหน้าจอ
+    renderHistory(); // ดึงประวัติมาโชว์ทันทีที่เปิดแอป
+
+    // หยุดระบายสีเมื่อปล่อยนิ้ว
     window.addEventListener('mouseup', () => isDrawing = false);
     window.addEventListener('touchend', () => isDrawing = false);
 }
 
+// --- 2. สร้างตารางเวลา (รองรับ Touch ได้ลื่นไหล) ---
 function buildTimeGrid() {
     const timeGrid = document.getElementById('time-grid');
     if (!timeGrid) return;
@@ -33,8 +35,10 @@ function buildTimeGrid() {
             <div class="hour-slots flex flex-1 gap-2 h-10">
                 ${Array(6).fill(0).map(() => `
                     <div class="slot flex-1 bg-white border-2 border-slate-100 rounded-xl cursor-pointer transition-all touch-none shadow-sm" 
-                         onmousedown="startPaint(this)" onmouseenter="continuePaint(this)"
-                         ontouchstart="handleTouchStart(event, this)" ontouchmove="handleTouchMove(event)"></div>
+                         onmousedown="startPaint(this)" 
+                         onmouseenter="continuePaint(this)"
+                         ontouchstart="handleTouchStart(event, this)" 
+                         ontouchmove="handleTouchMove(event)"></div>
                 `).join('')}
             </div>
         `;
@@ -42,14 +46,21 @@ function buildTimeGrid() {
     }
 }
 
-// --- 2. ระบบระบายสี ---
-function handleTouchStart(e, el) { isDrawing = true; toggleColor(el); }
+// --- 3. ระบบระบายสี (แยก Touch ให้ปุ่มอื่นกดติด) ---
+function handleTouchStart(e, el) {
+    isDrawing = true;
+    toggleColor(el);
+}
+
 function handleTouchMove(e) {
     if (!isDrawing) return;
     const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (target && target.classList.contains('slot')) toggleColor(target);
+    if (target && target.classList.contains('slot')) {
+        toggleColor(target);
+    }
 }
+
 function startPaint(el) { isDrawing = true; toggleColor(el); }
 function continuePaint(el) { if (isDrawing) toggleColor(el); }
 
@@ -65,78 +76,111 @@ function toggleColor(el) {
     updateTotal();
 }
 
-// --- 3. ระบบ Save และ Export (ปุ่มใช้งานได้จริง) ---
+// --- 4. ระบบประวัติ (History Management) ---
 
-// ฟังก์ชันบันทึกข้อมูลลง History (LocalStorage)
 function saveToHistory() {
     const dateVal = document.getElementById('datePicker').value;
     const totalVal = document.getElementById('totalHours').innerText;
-    const nameVal = document.getElementById('userName').value || "User";
+    const nameVal = document.getElementById('userName').value || ""; // ไม่ใส่ชื่อ fadlee ตามที่บันทึกไว้
 
     if (totalVal === "0h 00m") {
-        alert("กรุณาระบายสีตารางเวลาก่อนบันทึกครับ");
+        alert("กรุณาระบายสีตารางเวลาก่อนบันทึก");
         return;
     }
 
     const record = { id: Date.now(), date: dateVal, total: totalVal, user: nameVal };
     let history = JSON.parse(localStorage.getItem('study_history') || '[]');
-    history.unshift(record);
+    history.unshift(record); // เอาอันล่าสุดไว้บน
     localStorage.setItem('study_history', JSON.stringify(history));
 
-    alert("บันทึกข้อมูลเรียบร้อยแล้ว!");
-    if (window.renderHistory) renderHistory(); 
+    renderHistory(); // อัปเดต UI ทันที
+    alert("บันทึกประวัติเรียบร้อย!");
 }
 
-// ฟังก์ชันบันทึกเป็นรูปภาพ (Export)
+function renderHistory() {
+    const container = document.getElementById('history-list');
+    if (!container) return;
+
+    const history = JSON.parse(localStorage.getItem('study_history') || '[]');
+    
+    if (history.length === 0) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-300 font-bold">ไม่มีประวัติการบันทึก</div>`;
+        return;
+    }
+
+    container.innerHTML = history.map(item => `
+        <div class="bg-white p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm mb-4">
+            <div>
+                <div class="text-[10px] font-black text-indigo-500 uppercase">${item.date}</div>
+                <div class="text-xl font-black text-slate-800">${item.total}</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">BY: ${item.user}</div>
+            </div>
+            <button onclick="deleteHistory(${item.id})" class="p-2 text-red-400 font-bold">ลบ</button>
+        </div>
+    `).join('');
+}
+
+function deleteHistory(id) {
+    if (confirm("ต้องการลบประวัตินี้ใช่ไหม?")) {
+        let history = JSON.parse(localStorage.getItem('study_history') || '[]');
+        history = history.filter(item => item.id !== id);
+        localStorage.setItem('study_history', JSON.stringify(history));
+        renderHistory();
+    }
+}
+
+function clearAllHistory() {
+    if (confirm("ล้างประวัติทั้งหมดใช่ไหม?")) {
+        localStorage.removeItem('study_history');
+        renderHistory();
+    }
+}
+
+// --- 5. ระบบ Export รูปภาพ (เน้นตัวหนังสือเต็ม) ---
 async function downloadImage() {
     const captureArea = document.getElementById('capture-area');
     const rows = document.querySelectorAll('.time-row');
     const addBtn = document.querySelector('button[onclick*="Subject"]');
     const hiddenRows = [];
 
-    // ซ่อนแถวที่ว่าง
     rows.forEach(row => {
         const hasColor = Array.from(row.querySelectorAll('.slot')).some(s => s.style.background !== "" && s.style.background !== "white");
         if (!hasColor) { row.style.display = 'none'; hiddenRows.push(row); }
     });
+
     if (addBtn) addBtn.style.visibility = 'hidden';
 
-    try {
-        const canvas = await html2canvas(captureArea, { 
-            scale: 5, useCORS: true, backgroundColor: "#ffffff",
-            onclone: (clonedDoc) => {
-                const nameInp = clonedDoc.querySelector('#userName');
-                const dateInp = clonedDoc.querySelector('#datePicker');
-                if (nameInp) {
-                    nameInp.style.fontSize = '26px';
-                    nameInp.style.fontWeight = '900';
-                    nameInp.style.border = 'none';
-                    nameInp.style.height = 'auto';
-                }
-                if (dateInp) {
-                    dateInp.parentElement.style.fontSize = '26px';
-                    dateInp.parentElement.style.fontWeight = '900';
-                }
+    const canvas = await html2canvas(captureArea, { 
+        scale: 4, 
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        onclone: (clonedDoc) => {
+            // ปรับแก้ชื่อและวันที่ให้ชัดเจนในรูป
+            const nameInp = clonedDoc.querySelector('#userName');
+            if (nameInp) {
+                nameInp.style.fontSize = '24px';
+                nameInp.style.fontWeight = '900';
+                nameInp.style.height = '60px';
+                nameInp.style.border = 'none';
             }
-        });
-        const link = document.createElement('a');
-        link.download = `StudySummary-${document.getElementById('datePicker').value}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (e) {
-        alert("เกิดข้อผิดพลาดในการสร้างรูปภาพ");
-    } finally {
-        hiddenRows.forEach(row => row.style.display = 'flex');
-        if (addBtn) addBtn.style.visibility = 'visible';
-    }
+        }
+    });
+
+    hiddenRows.forEach(row => row.style.display = 'flex');
+    if (addBtn) addBtn.style.visibility = 'visible';
+
+    const link = document.createElement('a');
+    link.download = `Summary-${document.getElementById('datePicker').value}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
 }
 
-// --- 4. ระบบจัดการวิชา ---
+// --- Helpers ---
 function addSubject(name) {
     const container = document.getElementById('subject-list');
     const color = getRandomColor();
     const item = document.createElement('div');
-    item.className = 'subject-item flex items-center gap-4 cursor-pointer p-4 rounded-3xl transition-all border-2 border-transparent mb-3 shadow-sm';
+    item.className = 'subject-item flex items-center gap-4 cursor-pointer p-4 rounded-3xl transition-all border-2 border-transparent mb-2 shadow-sm';
     item.onclick = () => {
         document.querySelectorAll('.subject-item').forEach(el => el.classList.remove('active', 'bg-slate-100', 'border-slate-300'));
         item.classList.add('active', 'bg-slate-100', 'border-slate-300');
@@ -151,18 +195,19 @@ function addSubject(name) {
     if (container.children.length === 1) item.click();
 }
 
-// --- 5. Helpers ---
 function setupDefaultSubjects() {
     const container = document.getElementById('subject-list');
     if (container && container.children.length === 0) {
         ['Quran', 'English', 'Academic'].forEach(n => addSubject(n));
     }
 }
+
 function updateTotal() {
     const painted = Array.from(document.querySelectorAll('.slot')).filter(s => s.style.background !== "" && s.style.background !== "white");
     const mins = painted.length * 10;
     document.getElementById('totalHours').innerText = `${Math.floor(mins/60)}h ${String(mins%60).padStart(2, '0')}m`;
 }
+
 function getRandomColor() {
     if (usedColors.length === modernColors.length) usedColors = [];
     let available = modernColors.filter(c => !usedColors.includes(c));
@@ -170,13 +215,16 @@ function getRandomColor() {
     usedColors.push(res);
     return res;
 }
+
 function hexToRgb(hex) {
     const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
     return `rgb(${r}, ${g}, ${b})`;
 }
+
 function addNewSubjectPrompt() {
     const name = prompt("ชื่อวิชาใหม่:");
     if (name) addSubject(name);
 }
 
+// รันโปรแกรม
 init();
