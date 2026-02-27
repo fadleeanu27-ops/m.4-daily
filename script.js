@@ -1,17 +1,22 @@
 /**
- * Study Flow Pro - Fix Mobile Menu & Ultra Clarity
- * แก้ไข: ปุ่มกดไม่ได้บนมือถือ, ตัวหนังสือขาด, ความคมชัด 5X
+ * Study Flow Pro - Ultimate Edition (Mobile & iPad Optimized)
+ * แก้ไข: ปุ่มกดไม่ได้, ข้อความขาด, ความคมชัด Ultra HD
  */
 
+// 1. การตั้งค่าสีและตัวแปรเริ่มต้น
 const modernColors = ['#4F46E5', '#E11D48', '#7C3AED', '#059669', '#D97706', '#2563EB', '#DC2626', '#0891B2', '#9333EA', '#EA580C'];
 let usedColors = []; 
 let currentSelectedColor = modernColors[0];
 let isDrawing = false;
 
+// 2. ฟังก์ชันเริ่มต้นระบบ
 function init() {
     const datePicker = document.getElementById('datePicker');
-    if (datePicker) datePicker.value = new Date().toISOString().split('T')[0];
+    if (datePicker) {
+        datePicker.value = new Date().toISOString().split('T')[0];
+    }
 
+    // สร้างตารางเวลา 04:00 - 23:00 (6 ช่องต่อชั่วโมง)
     const timeGrid = document.getElementById('time-grid');
     if (timeGrid) {
         timeGrid.innerHTML = ''; 
@@ -32,21 +37,20 @@ function init() {
         }
     }
 
+    // สร้างวิชาเริ่มต้น
     const subjectList = document.getElementById('subject-list');
     if (subjectList) {
         subjectList.innerHTML = '';
         ['Quran', 'English', 'Academic'].forEach(n => addSubject(n));
     }
 
-    // หยุดระบายสีเมื่อปล่อยนิ้ว
+    // Event Listeners สำหรับหยุดการระบายสี
     window.addEventListener('mouseup', () => isDrawing = false);
     window.addEventListener('touchend', () => isDrawing = false);
 }
 
-// --- ระบบระบายสีแบบไม่รบกวนปุ่มอื่น ---
-
+// 3. ระบบระบายสี (ลากนิ้ว/เมาส์)
 function handleTouchStart(e, el) {
-    // ไม่ใช้ e.preventDefault() ที่นี่เพื่อให้ปุ่มอื่นๆ ยังทำงานได้
     isDrawing = true;
     toggleColor(el);
 }
@@ -75,61 +79,7 @@ function toggleColor(el) {
     updateTotal();
 }
 
-// --- ฟังก์ชัน Export รูปภาพ (เน้นตัวหนังสือเต็มและชัดเจน) ---
-
-async function downloadImage() {
-    const captureArea = document.getElementById('capture-area');
-    const rows = document.querySelectorAll('.time-row');
-    const addBtn = document.querySelector('button[onclick*="Subject"]');
-    const hiddenRows = [];
-
-    rows.forEach(row => {
-        const hasColor = Array.from(row.querySelectorAll('.slot')).some(s => s.style.background !== "" && s.style.background !== "white");
-        if (!hasColor) { row.style.display = 'none'; hiddenRows.push(row); }
-    });
-
-    if (addBtn) addBtn.style.visibility = 'hidden';
-
-    const canvas = await html2canvas(captureArea, { 
-        scale: 5, 
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        onclone: (clonedDoc) => {
-            // แก้ไขข้อความขาด: ปรับความกว้างและ Padding ของ Input ในรูปภาพ
-            const nameInput = clonedDoc.querySelector('#userName') || clonedDoc.querySelector('input[type="text"]');
-            const dateInput = clonedDoc.querySelector('#datePicker');
-
-            if (nameInput) {
-                nameInput.style.height = '60px';
-                nameInput.style.padding = '0 20px';
-                nameInput.style.fontSize = '22px';
-                nameInput.style.border = 'none';
-            }
-
-            if (dateInput) {
-                dateInput.parentElement.style.height = '60px';
-                dateInput.parentElement.style.display = 'flex';
-                dateInput.parentElement.style.alignItems = 'center';
-            }
-            
-            clonedDoc.querySelectorAll('.time-label').forEach(l => {
-                l.style.color = '#000000';
-                l.style.fontWeight = '900';
-            });
-        }
-    });
-
-    hiddenRows.forEach(row => row.style.display = 'flex');
-    if (addBtn) addBtn.style.visibility = 'visible';
-
-    const link = document.createElement('a');
-    link.download = `StudyFlow-HighRes.png`;
-    link.href = canvas.toDataURL('image/png', 1.0);
-    link.click();
-}
-
-// --- ระบบวิชาและการคำนวณ ---
-
+// 4. ระบบวิชา (เลือก/เพิ่ม/ลบ)
 function addSubject(name) {
     const container = document.getElementById('subject-list');
     const color = getRandomColor();
@@ -142,6 +92,12 @@ function addSubject(name) {
         currentSelectedColor = color;
     };
 
+    // กดค้างหรือคลิกขวาเพื่อลบ
+    item.oncontextmenu = (e) => {
+        e.preventDefault();
+        if(confirm(`ลบวิชา "${name}"?`)) item.remove();
+    };
+
     item.innerHTML = `
         <div class="w-5 h-5 rounded-full" style="background:${color}"></div>
         <span class="text-sm font-black text-slate-800 flex-1">${name}</span>
@@ -150,6 +106,66 @@ function addSubject(name) {
     if (container.children.length === 1) item.click();
 }
 
+// 5. ระบบ Export รูปภาพ (แก้ไขข้อความแหว่งและเพิ่มความคมชัด)
+async function downloadImage() {
+    const captureArea = document.getElementById('capture-area');
+    const rows = document.querySelectorAll('.time-row');
+    const addBtn = document.querySelector('button[onclick*="Subject"]');
+    const hiddenRows = [];
+
+    // ซ่อนแถวที่ไม่ได้ติ๊กสี
+    rows.forEach(row => {
+        const hasColor = Array.from(row.querySelectorAll('.slot')).some(s => s.style.background !== "" && s.style.background !== "white");
+        if (!hasColor) { row.style.display = 'none'; hiddenRows.push(row); }
+    });
+
+    if (addBtn) addBtn.style.visibility = 'hidden';
+
+    const canvas = await html2canvas(captureArea, { 
+        scale: 5, // ชัดระดับ 5 เท่า
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        onclone: (clonedDoc) => {
+            // ปรับแก้ข้อความชื่อและวันที่ให้เห็นเต็มในรูป
+            const nameInput = clonedDoc.querySelector('#userName') || clonedDoc.querySelector('input[type="text"]');
+            const dateInput = clonedDoc.querySelector('#datePicker');
+
+            if (nameInput) {
+                nameInput.style.height = '70px'; // ขยายความสูงกล่อง
+                nameInput.style.display = 'flex';
+                nameInput.style.alignItems = 'center';
+                nameInput.style.fontSize = '24px'; // ตัวใหญ่ชัดเจน
+                nameInput.style.fontWeight = '900';
+                nameInput.style.border = 'none';
+            }
+
+            if (dateInput) {
+                const dateContainer = dateInput.parentElement;
+                dateContainer.style.height = '70px';
+                dateContainer.style.display = 'flex';
+                dateContainer.style.alignItems = 'center';
+                dateContainer.style.fontSize = '24px';
+                dateContainer.style.fontWeight = '900';
+            }
+            
+            clonedDoc.querySelectorAll('.time-label').forEach(l => {
+                l.style.color = '#000000';
+                l.style.fontWeight = '900';
+            });
+        }
+    });
+
+    // คืนค่าหน้าจอเดิม
+    hiddenRows.forEach(row => row.style.display = 'flex');
+    if (addBtn) addBtn.style.visibility = 'visible';
+
+    const link = document.createElement('a');
+    link.download = `StudyFlow-Report.png`;
+    link.href = canvas.toDataURL('image/png', 1.0);
+    link.click();
+}
+
+// 6. ฟังก์ชันเสริม
 function updateTotal() {
     const painted = Array.from(document.querySelectorAll('.slot')).filter(s => s.style.background !== "" && s.style.background !== "white");
     const mins = painted.length * 10;
@@ -174,4 +190,5 @@ function addNewSubjectPrompt() {
     if (name) addSubject(name);
 }
 
+// รันระบบ
 init();
